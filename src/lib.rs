@@ -125,10 +125,11 @@ impl TimeZoneInfo {
             return bogus("unrecognized magic in header");
         }
 
-        if (hdr.isstdcnt.0 != 0 || hdr.isutcnt.0 != 0)
-            && hdr.isstdcnt.0 != hdr.isutcnt.0
-        {
-            return bogus("mismatched isutcnt and isstdcnt");
+        if hdr.isstdcnt.0 != 0 && hdr.isstdcnt.0 != hdr.typecnt.0 {
+            return bogus("isstdcnt not zero or equal to typecnt");
+        }
+        if hdr.isutcnt.0 != 0 && hdr.isutcnt.0 != hdr.typecnt.0 {
+            return bogus("isutcnt not zero or equal to typecnt");
         }
 
         let mut result = Self {
@@ -204,6 +205,12 @@ impl TimeZoneInfo {
             let is_ut = result.is_ut.get(i).unwrap_or(&IsUT::Local);
             if (is_std, is_ut) == (&IsStd::Wall, &IsUT::UT) {
                 return bogus("transition times can't be universal + wall");
+            }
+        }
+
+        for typ_idx in &result.transition_types {
+            if *typ_idx as usize > result.local_time_types.len() {
+                return bogus("one or more transition types out of range");
             }
         }
 
