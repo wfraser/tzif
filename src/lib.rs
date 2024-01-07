@@ -1,6 +1,7 @@
 //! Time Zone Information Format (TZif), RFC 8536
 
 use std::io::{self, Read};
+use std::time::{SystemTime, UNIX_EPOCH};
 
 #[repr(transparent)]
 #[derive(Copy, Clone)]
@@ -224,6 +225,21 @@ impl TimeZoneInfo {
         }
     }
 
+    pub fn at(&self, t: SystemTime) -> Option<LocalTimeType<'_>> {
+        let ut = match t.duration_since(UNIX_EPOCH) {
+            Ok(d) => d.as_secs() as i64,
+            Err(e) => -(e.duration().as_secs() as i64),
+        };
+        let mut prev = None;
+        for tr in self.iter_transitions() {
+            if tr.at_time.to_ut(&tr.local) > ut {
+                return prev;
+            }
+            prev = Some(tr.local);
+        }
+        None
+    }
+
     fn local_time_type(&self, idx: usize) -> LocalTimeType<'_> {
         let typ = &self.local_time_types[idx];
 
@@ -241,6 +257,15 @@ impl TimeZoneInfo {
             desig,
             ut_offset_secs: typ.ut_off_secs,
             is_dst: typ.is_dst,
+        }
+    }
+
+    fn adj_time(&self, ts: i64, typ_idx: usize) -> Time {
+        match (self.is_std[typ_idx], self.is_ut[typ_idx]) {
+            (IsStd::Standard, IsUT::UT) => Time::UT(ts),
+            (IsStd::Standard, IsUT::Local) => Time::LocalStandard(ts),
+            (IsStd::Wall, IsUT::UT) => panic!("transition time can't be wall+universal"),
+            (IsStd::Wall, IsUT::Local) => Time::LocalWall(ts),
         }
     }
 }
@@ -261,12 +286,7 @@ impl<'a> Iterator for TransitionIterator<'a> {
         let at_ts = self.tzif.transition_times[self.idx];
         let typ_idx = self.tzif.transition_types[self.idx];
         let local = self.tzif.local_time_type(typ_idx as usize);
-        let at_time = match (self.tzif.is_std[typ_idx as usize], self.tzif.is_ut[typ_idx as usize]) {
-            (IsStd::Standard, IsUT::UT) => Time::UT(at_ts),
-            (IsStd::Standard, IsUT::Local) => Time::LocalStandard(at_ts),
-            (IsStd::Wall, IsUT::UT) => panic!("transition time can't be wall+universal"),
-            (IsStd::Wall, IsUT::Local) => Time::LocalWall(at_ts),
-        };
+        let at_time = self.tzif.adj_time(at_ts, typ_idx as usize);
 
         self.idx += 1;
         Some(TimeTransition { at_time, local })
