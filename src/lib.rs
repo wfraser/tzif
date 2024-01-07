@@ -102,7 +102,8 @@ pub struct LocalTimeTypeRecord {
 }
 
 fn bogus<T, E>(inner: E) -> io::Result<T>
-    where E: Into<Box<dyn std::error::Error + Send + Sync>>,
+where
+    E: Into<Box<dyn std::error::Error + Send + Sync>>,
 {
     Err(io::Error::new(io::ErrorKind::InvalidData, inner))
 }
@@ -113,8 +114,7 @@ impl TimeZoneInfo {
         if v1_result.version == 1 {
             return Ok(v1_result);
         }
-        Self::parse_internal(&mut reader, false)
-            .or(Ok(v1_result))
+        Self::parse_internal(&mut reader, false).or(Ok(v1_result))
     }
 
     fn parse_internal(mut reader: impl Read, v1: bool) -> io::Result<Self> {
@@ -143,15 +143,17 @@ impl TimeZoneInfo {
             ..Self::default()
         };
 
-        for _ in 0 .. hdr.timecnt.into() {
+        for _ in 0..hdr.timecnt.into() {
             let t = read_time(v1, &mut reader)?;
             result.transition_times.push(t);
-        };
+        }
 
-        result.transition_types.resize(u32::from(hdr.timecnt) as usize, 0);
+        result
+            .transition_types
+            .resize(u32::from(hdr.timecnt) as usize, 0);
         reader.read_exact(&mut result.transition_types)?;
 
-        for _ in 0 .. hdr.typecnt.into() {
+        for _ in 0..hdr.typecnt.into() {
             let mut buf = [0u8; 4];
             reader.read_exact(&mut buf)?;
             let ut_off_secs = i32::from_be_bytes(buf);
@@ -169,11 +171,13 @@ impl TimeZoneInfo {
             };
             result.local_time_types.push(record);
         }
-        
-        result.time_zone_designations.resize(u32::from(hdr.charcnt) as usize, 0);
+
+        result
+            .time_zone_designations
+            .resize(u32::from(hdr.charcnt) as usize, 0);
         reader.read_exact(&mut result.time_zone_designations)?;
 
-        for _ in 0 .. hdr.leapcnt.into() {
+        for _ in 0..hdr.leapcnt.into() {
             let t = read_time(v1, &mut reader)?;
             let mut buf = [0u8; 4];
             reader.read_exact(&mut buf)?;
@@ -201,7 +205,7 @@ impl TimeZoneInfo {
             });
         }
 
-        for i in 0 .. result.is_std.len().max(result.is_ut.len()) {
+        for i in 0..result.is_std.len().max(result.is_ut.len()) {
             let is_std = result.is_std.get(i).unwrap_or(&IsStd::Wall);
             let is_ut = result.is_ut.get(i).unwrap_or(&IsUT::Local);
             if (is_std, is_ut) == (&IsStd::Wall, &IsUT::UT) {
@@ -219,10 +223,7 @@ impl TimeZoneInfo {
     }
 
     pub fn iter_transitions(&self) -> TransitionIterator<'_> {
-        TransitionIterator {
-            tzif: self,
-            idx: 0,
-        }
+        TransitionIterator { tzif: self, idx: 0 }
     }
 
     pub fn at(&self, t: SystemTime) -> Option<LocalTimeType<'_>> {
@@ -318,7 +319,9 @@ impl Time {
         match self {
             Time::UT(t) => *t,
             Time::LocalStandard(t) => t + i64::from(local.ut_offset_secs),
-            Time::LocalWall(t) => t + i64::from(local.ut_offset_secs) + if local.is_dst { 60*60 }  else { 0 },
+            Time::LocalWall(t) => {
+                t + i64::from(local.ut_offset_secs) + if local.is_dst { 60 * 60 } else { 0 }
+            }
         }
     }
 }
@@ -341,6 +344,7 @@ mod tests {
 
     #[test]
     fn test_header_v1() {
+        #[rustfmt::skip]
         let bytes = [
             0x54, 0x5a, 0x69, 0x66,
             

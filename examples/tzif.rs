@@ -3,7 +3,10 @@ use std::fs::File;
 use std::time::{SystemTime, UNIX_EPOCH};
 
 fn main() -> std::io::Result<()> {
-    let rn = SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_secs() as i64;
+    let rn = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .unwrap()
+        .as_secs() as i64;
     let info = tzif::TimeZoneInfo::parse(File::open(env::args_os().nth(1).unwrap())?)?;
 
     println!("currently: {:?}", info.at(SystemTime::now()));
@@ -17,7 +20,8 @@ fn main() -> std::io::Result<()> {
             found = true;
         }
         let hours = t.local.ut_offset_secs as f64 / 60. / 60.;
-        println!("at {:?}, {} (UTC{}{}){}",
+        println!(
+            "at {:?}, {} (UTC{}{}){}",
             t.at_time,
             t.local.desig,
             if hours > 0. { '+' } else { '-' },
